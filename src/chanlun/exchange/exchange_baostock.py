@@ -1,5 +1,5 @@
 from typing import Union
-import baostock as bs
+#import baostock as bs
 from chanlun import fun
 
 from chanlun.exchange.exchange import *

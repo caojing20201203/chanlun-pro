@@ -4,7 +4,7 @@ from chanlun import config
 from chanlun.exchange.exchange import Exchange
 from chanlun.exchange.exchange_binance_spot import ExchangeBinanceSpot
 from chanlun.exchange.exchange_tdx import ExchangeTDX
-from chanlun.exchange.exchange_baostock import ExchangeBaostock
+#from chanlun.exchange.exchange_baostock import ExchangeBaostock
 from chanlun.exchange.exchange_db import ExchangeDB
 from chanlun.exchange.exchange_tdx_hk import ExchangeTDXHK
 from chanlun.exchange.exchange_tdx_futures import ExchangeTDXFutures
@@ -36,8 +36,8 @@ def get_exchange(market: Market) -> Exchange:
             from chanlun.exchange.exchange_futu import ExchangeFutu
 
             g_exchange_obj[market.value] = ExchangeFutu()
-        elif config.EXCHANGE_A == "baostock":
-            g_exchange_obj[market.value] = ExchangeBaostock()
+        #elif config.EXCHANGE_A == "baostock":
+        #    g_exchange_obj[market.value] = ExchangeBaostock()
         elif config.EXCHANGE_A == "db":
             g_exchange_obj[market.value] = ExchangeDB(Market.A.value)
         elif config.EXCHANGE_A == "qmt":

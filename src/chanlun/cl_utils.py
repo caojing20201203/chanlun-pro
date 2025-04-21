@@ -636,6 +636,7 @@ def cl_data_to_tv_chart(cd: ICL, config: dict, to_frequency: str = None):
     将缠论数据，转换成 tv 画图的坐标数据
     """
     # K线
+    """
     klines = [
         {
             "date": k.date,
@@ -648,6 +649,8 @@ def cl_data_to_tv_chart(cd: ICL, config: dict, to_frequency: str = None):
         for k in cd.get_klines()
     ]
     klines = pd.DataFrame(klines)
+    """
+    klines = cd.get_src_klines()
     klines.loc[:, "code"] = cd.get_code()
     if to_frequency is not None:
         # 将数据转换成指定的周期数据
@@ -662,12 +665,14 @@ def cl_data_to_tv_chart(cd: ICL, config: dict, to_frequency: str = None):
         else:
             raise Exception(f"图表周期数据转换，不支持的市场 {market}")
     # K 线数据
-    kline_ts = klines["date"].map(fun.datetime_to_int).tolist()
-    kline_cs = klines["close"].tolist()
-    kline_os = klines["open"].tolist()
-    kline_hs = klines["high"].tolist()
-    kline_ls = klines["low"].tolist()
-    kline_vs = klines["volume"].tolist()
+    # ToDO 
+    kline_ts = klines['date'].map(fun.datetime_to_int).tolist()
+    #kline_ts = klines["date"].map(fun.datetime_to_int).tolist()
+    kline_cs = klines["c"].tolist()
+    kline_os = klines["o"].tolist()
+    kline_hs = klines["h"].tolist()
+    kline_ls = klines["l"].tolist()
+    kline_vs = klines["a"].tolist()
 
     fx_data = []
     if config["chart_show_fx"] == "1":
@@ -912,9 +917,9 @@ def bi_td(bi: BI, cd: ICL):
     if len(next_ks) == 0:
         return False
     for _nk in next_ks:
-        if bi.type == "up" and _nk.c < _nk.o and _nk.c < bi.end.klines[-1].l:
+        if (bi.type == BiType.UP or bi.type == BiType.Verity_UP) and _nk.c < _nk.o and _nk.c < bi.end.klines[-1].l:
             return True
-        elif bi.type == "down" and _nk.c > _nk.o and _nk.c > bi.end.klines[-1].h:
+        elif (bi.type == BiType.DOWN or bi.type == BiType.Verify_DOWN) and _nk.c > _nk.o and _nk.c > bi.end.klines[-1].h:
             return True
 
     return False

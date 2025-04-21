@@ -9,10 +9,43 @@ from typing import *
 import numpy as np
 import pandas as pd
 
+
 """
 CL_*** 配置项，可以在调用缠论计算时，通过传递 config 变量进行变更，如 config['CL_BI_FX_STRICT'] = True
 """
 
+class FxStatus(Enum):
+    TOP = '顶分型'
+    BOTTOM = '底分型'
+    VERIFY_TOP = '顶分型验证'
+    VERIFY_BOTTOM = '底分型验证'
+    FAILURE_TOP = '顶分型失败'
+    FAILURE_BOTTOM = '底分型失败'
+
+class BiType(Enum):
+    NONE = ''
+    UP = '上升笔'
+    DOWN = '下降笔'
+    NEW_UP = '新上升笔'
+    NEW_DOWN = '新下降笔'
+    UPDATE_UP = '更新上升笔'
+    UPDATE_DOWN = '更新下降笔'
+    
+    VERIFY_UP = '上升笔验证'
+    VERIFY_DOWN = '下降笔验证'
+    FAILURE_UP = '上升笔失败'
+    FAILURE_DOWN = '下降笔失败'
+
+class XianDuanType(Enum):
+    NONE = '无'
+    UP = '上升线段'
+    NEW_UP = '新上升线段'
+    VERIFY_UP = '上升线段验证'
+    NEW_VERIFY_UP = '新上升线段验证'
+    DOWN = '下降线段'
+    NEW_DOWN = '新下降线段'
+    VERIFY_DOWN = '下降线段验证'
+    NEW_VERIFY_DOWN = '新下降线段验证'
 
 class Config(Enum):
     """
@@ -155,14 +188,14 @@ class FX:
 
     def __init__(
         self,
-        _type: str,
+        _type: FxStatus,
         k: CLKline,
         klines: List[CLKline],
         val: float,
         index: int = 0,
         done: bool = True,
     ):
-        self.type: str = _type  # 分型类型 （ding 顶分型 di 底分型）
+        self.type: FxStatus = _type  # 分型类型 （ding 顶分型 di 底分型）
         self.k: CLKline = k
         self.klines: List[CLKline] = klines
         self.val: float = val
@@ -182,7 +215,7 @@ class FX:
             return ld
         if self.klines[0].k_index == -1 or self.klines[-1].k_index == -1:
             return ld
-        if self.type == "ding":
+        if self.type == FxStatus.TOP or self.type == FxStatus.VERIFY_TOP:
             # 第三个缠论K线要一根单阴线
             if len(three_k.klines) > 1:
                 return ld
@@ -205,7 +238,7 @@ class FX:
                 three_k.klines[0].c - three_k.klines[0].l
             ) / (three_k.klines[0].h - three_k.klines[0].l) < 0.3:
                 ld += 1
-        elif self.type == "di":
+        elif self.type == FxStatus.BOTTOM or self.type == FxStatus.VERIFY_BOTTOM:
             # 第三个缠论K线要一根单阳线
             if len(three_k.klines) > 1:
                 return ld
@@ -286,7 +319,7 @@ class FX:
         )
 
     def __str__(self):
-        return f"index: {self.index} type: {self.type} date : {self.k.date} val: {self.val} done: {self.done}"
+        return f"index: {self.index} type: {self.type.value} date : {self.k.date} val: {self.val} done: {self.done}"
 
 
 class LINE:
@@ -484,7 +517,7 @@ class BI(LINE):
         self,
         start: FX,
         end: FX = None,
-        _type: str = None,
+        _type: BiType = None,
         index: int = 0,
         default_zs_type: str = None,
     ):
@@ -500,6 +533,49 @@ class BI(LINE):
         # 记录是否是拆分笔
         self.is_split = ""
 
+        # 设置high,low，_type
+        if start.type == FxStatus.TOP:
+            if end.type == FxStatus.BOTTOM or end.type == FxStatus.VERIFY_BOTTOM:
+                self.type = BiType.DOWN
+                self.high = start.val
+                self.low = end.val
+            else:
+                if end.high > start.high:
+                    pass
+        elif start.type == FxStatus.BOTTOM:
+            if end.type == FxStatus.TOP or end.type == FxStatus.VERIFY_TOP:
+                self.type = BiType.UP
+                self.high = end.val
+                self.low = start.val
+            else:
+                if end.low < start.low:
+                    pass
+        elif start.type == FxStatus.VERIFY_TOP:
+            if end.type == FxStatus.VERIFY_BOTTOM:
+                self.type = BiType.VERIFY_DOWN
+                self.high = start.val
+                self.low = end.val
+            elif end.type == FxStatus.BOTTOM:
+                self.type = BiType.DOWN
+                self.high = start.val
+                self.low = end.val
+            else:
+                if end.high > start.high:
+                    pass
+        elif start.type == FxStatus.VERIFY_BOTTOM:
+            if end.type == FxStatus.VERIFY_TOP:
+                self.type = BiType.VERIFY_UP
+                self.high = end.val
+                self.low = start.val
+            elif end.type == FxStatus.TOP:
+                self.type = BiType.UP
+                self.high = end.val
+                self.low = start.val
+            else:
+                if end.low < start.low:
+                    pass
+
+
     @property
     def td(self):
         """
@@ -509,7 +585,7 @@ class BI(LINE):
         return False
 
     def __str__(self):
-        return f"index: {self.index} type: {self.type} FX: ({self.start.k.date} - {self.end.k.date}) high: {self.high} low: {self.low} done: {self.is_done()}"
+        return f"index: {self.index} type: {self.type.value} FX: ({self.start.k.date} - {self.end.k.date}) high: {self.high} low: {self.low} done: {self.is_done()}"
 
     def is_done(self) -> bool:
         """
@@ -782,24 +858,34 @@ class XD(LINE):
 
         self.not_del: bool = False  # 计算过程中，不允许删除重新计算
         self.not_yx: bool = False  # 计算过程中，不允许进行延续计算
+        if _type == XianDuanType.UP or _type == XianDuanType.VERIFY_UP:
+            self.high = end.val
+            self.low = start.val
+        elif _type == XianDuanType.DOWN or _type == XianDuanType.VERIFY_DOWN:
+            self.high = start.val
+            self.low = end.val
+
 
     def is_qk(self) -> bool:
         """
         成线段的分型是否有缺口
         """
-        return self.ding_fx.qk if self.type == "up" else self.di_fx.qk
+        #return self.ding_fx.qk if self.type == "up" else self.di_fx.qk
+        return False
 
     def fx_is_done(self) -> bool:
         """
         返回构成线段的结束特征序列分型是否完成
         """
-        return self.ding_fx.done if self.type == "up" else self.di_fx.done
+        #return self.ding_fx.done if self.type == "up" else self.di_fx.done
+        return True
 
     def fx_is_bad_line(self) -> bool:
         """
         返回构成线段的结束特征序列分型是否是有笔包含的情况
         """
-        return self.ding_fx.is_line_bad if self.type == "up" else self.di_fx.is_line_bad
+        #return self.ding_fx.is_line_bad if self.type == "up" else self.di_fx.is_line_bad
+        return False
 
     def is_done(self) -> bool:
         return self.done

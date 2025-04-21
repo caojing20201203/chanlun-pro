@@ -11,7 +11,6 @@ import redis
 import pathlib
 import re
 
-
 def check_env():
     # 检查 Python 版本
     version = f"{sys.version_info[0]}.{sys.version_info[1]}"
